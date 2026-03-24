@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Macaron Pegboard Sticky Todo</title>
+  <style>
+    :root{
+      --work:#a9d7ff;
+      --fun:#ffc5de;
+      --life:#d8c3ff;
+      --study:#bfe9b8;
+
+      --cream:#fff8f1;
+      --board1:#dff2ff;
+      --board2:#ffe6f1;
+      --board3:#efe6ff;
+      --hole:#ffffffaa;
+      --ink:#5a5f73;
+      --shadow-soft: 0 10px 24px rgba(121, 116, 151, .14);
+      --shadow-paper: 0 14px 30px rgba(106, 102, 143, .20);
+      --shadow-paper-strong: 0 22px 42px rgba(80, 72, 115, .26);
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 15% 10%, #fff7cf 0 6%, transparent 20%),
+        radial-gradient(circle at 80% 12%, #ffe5f1 0 7%, transparent 22%),
+        linear-gradient(180deg,#fffaf4 0%,#fff3fb 48%,#f5fbff 100%);
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background:
+        radial-gradient(circle at 8% 86%, rgba(255,209,231,.45), transparent 18%),
+        radial-gradient(circle at 88% 90%, rgba(201,232,255,.38), transparent 20%),
+        radial-gradient(circle at 30% 0%, rgba(255,252,223,.45), transparent 18%);
+      filter: blur(8px);
+    }
+
+    .app{
+      position:relative;
+      width:100vw;
+      height:100vh;
+      overflow:hidden;
+    }
+
+    .floating-decor{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      z-index:0;
+      background:
+        radial-gradient(circle at 12% 14%, rgba(255,255,255,.9) 0 2px, transparent 3px),
+        radial-gradient(circle at 22% 20%, rgba(255,255,255,.75) 0 2px, transparent 3px),
+        radial-gradient(circle at 71% 15%, rgba(255,255,255,.85) 0 2px, transparent 3px),
+        radial-gradient(circle at 85% 22%, rgba(255,255,255,.8) 0 2px, transparent 3px),
+        radial-gradient(circle at 17% 80%, rgba(255,255,255,.8) 0 2px, transparent 3px),
+        radial-gradient(circle at 90% 78%, rgba(255,255,255,.75) 0 2px, transparent 3px);
+      opacity:.85;
+    }
+
+    .topbar{
+      position:absolute;
+      left:50%;
+      top:18px;
+      transform:translateX(-50%);
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:12px 18px;
+      border-radius:999px;
+      background:rgba(255,255,255,.76);
+      backdrop-filter: blur(14px);
+      box-shadow:var(--shadow-soft);
+      z-index:50;
+      font-size:14px;
+      flex-wrap:wrap;
+      justify-content:center;
+      max-width:min(92vw,980px);
+    }
+    .legend{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      color:#6a6f82;
+      font-weight:700;
+    }
+    .dot{
+      width:12px;height:12px;border-radius:50%;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+      display:inline-block;
+    }
+
+    .board-wrap{
+      position:absolute;
+      inset:0;
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap:2vw;
+      padding: 105px 8vw 90px;
+      z-index:10;
+    }
+
+    .board-shell{
+      position:relative;
+      border-radius:34px;
+      padding:16px;
+      box-shadow: 0 18px 40px rgba(152, 144, 181, .16);
+      transition: transform .22s ease, box-shadow .22s ease;
+    }
+    .board-shell:nth-child(1){
+      background:linear-gradient(180deg,#ffffff 0%, #fdf8ff 100%);
+    }
+    .board-shell:nth-child(2){
+      background:linear-gradient(180deg,#fffdfd 0%, #fff8fb 100%);
+    }
+    .board-shell:nth-child(3){
+      background:linear-gradient(180deg,#ffffff 0%, #fafcff 100%);
+    }
+    .board-shell:hover{
+      transform:translateY(-2px);
+      box-shadow:0 22px 44px rgba(139,128,170,.20);
+    }
+
+    .board{
+      position:relative;
+      height:100%;
+      min-height:540px;
+      border-radius:28px;
+      overflow:hidden;
+      box-shadow: inset 0 3px 10px rgba(255,255,255,.65), inset 0 -8px 18px rgba(124,125,164,.08);
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .board.todo{background:
+      radial-gradient(circle, var(--hole) 1.8px, transparent 2.2px) 0 0 / 24px 24px,
+      linear-gradient(180deg,#eff9ff 0%, var(--board1) 100%);
+    }
+    .board.doing{background:
+      radial-gradient(circle, var(--hole) 1.8px, transparent 2.2px) 0 0 / 24px 24px,
+      linear-gradient(180deg,#fff2f7 0%, var(--board2) 100%);
+    }
+    .board.done{background:
+      radial-gradient(circle, var(--hole) 1.8px, transparent 2.2px) 0 0 / 24px 24px,
+      linear-gradient(180deg,#f6f1ff 0%, var(--board3) 100%);
+    }
+    .board::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.35), transparent 18%),
+        radial-gradient(circle at 50% 20%, rgba(255,255,255,.25), transparent 32%);
+      pointer-events:none;
+    }
+    .board.active-drop{
+      box-shadow: inset 0 0 0 4px rgba(255,255,255,.7), 0 14px 30px rgba(143,131,177,.18);
+      transform:scale(1.01);
+    }
+
+    .board-title{
+      position:absolute;
+      top:18px; left:20px; right:20px;
+      z-index:4;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+    .label-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 16px;
+      border-radius:999px;
+      background:rgba(255,255,255,.74);
+      box-shadow:0 8px 16px rgba(130,122,158,.12);
+      font-size:16px;
+      font-weight:800;
+      letter-spacing:.2px;
+    }
+    .label-pill .emoji{font-size:18px}
+    .add-btn{
+      appearance:none;border:none;cursor:pointer;
+      border-radius:999px;
+      padding:10px 14px;
+      background:rgba(255,255,255,.8);
+      color:#697087;font-weight:800;
+      box-shadow:0 8px 16px rgba(130,122,158,.12);
+      opacity:0; transform:translateY(-5px);
+      transition:.18s ease;
+    }
+    .board.todo:hover .add-btn{opacity:1; transform:translateY(0)}
+    .note-layer{
+      position:absolute;
+      inset:72px 14px 14px;
+    }
+
+    .note{
+      position:absolute;
+      width:130px;
+      min-height:136px;
+      padding:16px 14px 14px;
+      border-radius:3px;
+      cursor:grab;
+      user-select:none;
+      box-shadow:var(--shadow-paper);
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      transition: box-shadow .2s ease, filter .2s ease, transform .2s ease;
+      transform-origin:center top;
+      border:1px solid rgba(78,82,108,.05);
+      isolation:isolate;
+      will-change: transform, left, top;
+    }
+    .note.work{background:
+      linear-gradient(180deg,#dff0ff 0%, #cfe8ff 14%, var(--work) 100%);}
+    .note.fun{background:
+      linear-gradient(180deg,#ffeaf2 0%, #ffdeea 14%, var(--fun) 100%);}
+    .note.life{background:
+      linear-gradient(180deg,#f1e8ff 0%, #e8dcff 14%, var(--life) 100%);}
+    .note.study{background:
+      linear-gradient(180deg,#e8f9e5 0%, #d6f2d0 14%, var(--study) 100%);}
+
+    .note::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      border-radius:3px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.35), transparent 28%),
+        linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.04) 42%, rgba(255,255,255,0) 80%),
+        repeating-linear-gradient(180deg, rgba(255,255,255,.045) 0 2px, rgba(0,0,0,.015) 2px 3px);
+      pointer-events:none;
+      z-index:-1;
+    }
+    .note::after{
+      content:"";
+      position:absolute;
+      right:0; bottom:0;
+      width:24px; height:24px;
+      background: linear-gradient(135deg, rgba(255,255,255,.0) 0%, rgba(255,255,255,.55) 52%, rgba(198,196,220,.46) 100%);
+      clip-path: polygon(100% 0, 0 100%, 100% 100%);
+      border-bottom-right-radius:3px;
+      opacity:.88;
+      pointer-events:none;
+    }
+    .pin{
+      position:absolute;
+      left:50%; top:8px;
+      transform:translateX(-50%);
+      width:18px; height:18px; border-radius:50%;
+      background:radial-gradient(circle at 35% 35%, #fff 0%, #fff8fb 32%, #e7e0f9 100%);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.65), 0 3px 8px rgba(99,93,132,.18);
+    }
+    .tape{
+      position:absolute;
+      top:-7px; left:50%;
+      transform:translateX(-50%) rotate(var(--tape-rot, -4deg));
+      width:48px; height:18px;
+      background:linear-gradient(180deg, rgba(255,255,255,.76), rgba(255,255,255,.44));
+      border:1px solid rgba(255,255,255,.55);
+      border-radius:4px;
+      box-shadow:0 2px 6px rgba(119,114,146,.10);
+      opacity:.9;
+      mix-blend-mode:screen;
+    }
+
+    .note:hover{
+      box-shadow: 0 18px 36px rgba(94,86,126,.24);
+      filter:saturate(1.03);
+    }
+    .note.dragging{
+      cursor:grabbing;
+      z-index:1000;
+      box-shadow:var(--shadow-paper-strong);
+      animation: floatDrag .6s ease-in-out infinite alternate;
+    }
+    @keyframes floatDrag{
+      from{transform: rotate(var(--rot, 0deg)) translateY(-4px) scale(1.03);}
+      to{transform: rotate(calc(var(--rot, 0deg) + 1.2deg)) translateY(-11px) scale(1.055);}
+    }
+    .note.settle{
+      animation:settleBounce .34s cubic-bezier(.2,1.4,.32,1);
+    }
+    @keyframes settleBounce{
+      0%{transform: rotate(calc(var(--rot, 0deg) + 4deg)) translateY(-10px) scale(1.04)}
+      55%{transform: rotate(calc(var(--rot, 0deg) - 2deg)) translateY(2px) scale(.985)}
+      100%{transform: rotate(var(--rot, 0deg)) translateY(0) scale(1)}
+    }
+    .note.peel{
+      animation: peelAway .34s ease-in forwards;
+      pointer-events:none;
+    }
+    @keyframes peelAway{
+      0%{opacity:1; transform: rotate(var(--rot, 0deg)) scale(1)}
+      30%{opacity:1; transform: rotate(calc(var(--rot, 0deg) - 6deg)) translate(-2px,-4px) scale(1.03)}
+      100%{opacity:0; transform: rotate(calc(var(--rot, 0deg) - 16deg)) translate(26px,-30px) scale(.72)}
+    }
+
+    .note-top{padding-top:10px}
+    .note-meta{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:8px;
+    }
+    .category-badge{
+      font-size:11px;
+      font-weight:800;
+      color:#627067;
+      background:rgba(255,255,255,.42);
+      padding:4px 8px;
+      border-radius:999px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+    }
+    .time-stamp{
+      font-size:10px;
+      color:#70768a;
+      font-weight:700;
+      opacity:.85;
+    }
+    .note-text{
+      font-size:14px;
+      line-height:1.38;
+      color:#42505a;
+      white-space:pre-wrap;
+      word-break:break-word;
+      min-height:54px;
+    }
+    .note-bottom{
+      margin-top:10px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:8px;
+    }
+    .sticker-wrap{
+      display:flex; align-items:center; gap:6px;
+      font-size:15px;
+      line-height:1;
+      filter: drop-shadow(0 2px 2px rgba(255,255,255,.35));
+    }
+    .checkmark{
+      display:none;
+      font-size:18px;
+      transform: rotate(-8deg);
+    }
+    .note.done .checkmark{display:inline-block}
+
+    .note-actions{
+      display:flex;
+      gap:6px;
+      opacity:0;
+      pointer-events:none;
+      transition:.15s ease;
+    }
+    .note:hover .note-actions,
+    .note:focus-within .note-actions{
+      opacity:1;
+      pointer-events:auto;
+    }
+    .icon-btn{
+      appearance:none;border:none;cursor:pointer;
+      width:30px;height:30px;border-radius:50%;
+      background:rgba(255,255,255,.70);
+      color:#657084;
+      box-shadow:0 6px 12px rgba(110,103,141,.12);
+      font-size:14px;
+      transition:.15s ease;
+    }
+    .icon-btn:hover{
+      transform:translateY(-1px) scale(1.05);
+      background:rgba(255,255,255,.92);
+    }
+
+    .modal-backdrop{
+      position:absolute; inset:0;
+      display:none; place-items:center;
+      background:rgba(127,122,160,.18);
+      backdrop-filter: blur(6px);
+      z-index:100;
+      padding:20px;
+    }
+    .modal-backdrop.show{display:grid}
+
+    .modal{
+      width:min(92vw, 450px);
+      background:rgba(255,255,255,.93);
+      border-radius:28px;
+      padding:22px;
+      box-shadow:0 24px 54px rgba(116,109,148,.25);
+      animation: pop .18s ease-out;
+    }
+    @keyframes pop{
+      from{transform:translateY(10px) scale(.98); opacity:.8}
+      to{transform:translateY(0) scale(1); opacity:1}
+    }
+    .modal h2{
+      margin:0 0 8px;
+      color:#596179;
+      font-size:24px;
+    }
+    .modal p{
+      margin:0 0 16px;
+      color:#7a8094;
+      font-size:14px;
+      line-height:1.5;
+    }
+    .field{margin-bottom:14px}
+    .field label{
+      display:block;
+      margin-bottom:8px;
+      font-size:14px;
+      font-weight:800;
+      color:#677089;
+    }
+    textarea{
+      width:100%;
+      min-height:108px;
+      resize:vertical;
+      border:none;
+      outline:none;
+      padding:14px 15px;
+      border-radius:18px;
+      background:#fffdfd;
+      box-shadow: inset 0 0 0 1px rgba(178,177,204,.35);
+      font:inherit;
+      color:#4c556e;
+    }
+    textarea:focus{
+      box-shadow: inset 0 0 0 2px rgba(128,150,255,.42), 0 0 0 6px rgba(128,150,255,.08);
+    }
+
+    .chip-row{
+      display:flex; flex-wrap:wrap; gap:10px;
+    }
+    .chip{position:relative}
+    .chip input{
+      position:absolute; inset:0; opacity:0; pointer-events:none;
+    }
+    .chip span{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 14px;
+      border-radius:999px;
+      background:#ffffff;
+      box-shadow: inset 0 0 0 1px rgba(181,180,204,.26);
+      cursor:pointer;
+      font-size:14px;
+      font-weight:800;
+      color:#697087;
+      transition:.16s ease;
+    }
+    .chip input:checked + span{
+      transform:translateY(-1px);
+      box-shadow:0 10px 18px rgba(150,144,181,.14);
+    }
+    .chip-swatch{
+      width:14px;height:14px;border-radius:50%;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+    }
+
+    .modal-actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      margin-top:6px;
+    }
+    .btn{
+      appearance:none;border:none;cursor:pointer;
+      padding:11px 16px;border-radius:16px;
+      font-size:14px;font-weight:800;
+      transition:.16s ease;
+    }
+    .btn.secondary{
+      background:#f4f4fb;color:#6b7388;
+    }
+    .btn.primary{
+      background:linear-gradient(180deg,#8fb2ff,#7f96f7);
+      color:#fff;
+      box-shadow:0 12px 22px rgba(127,150,247,.24);
+    }
+    .btn:hover{transform:translateY(-1px)}
+
+    .tip{
+      position:absolute;
+      bottom:18px; left:50%; transform:translateX(-50%);
+      z-index:40;
+      padding:10px 14px;
+      background:rgba(255,255,255,.72);
+      backdrop-filter:blur(12px);
+      border-radius:999px;
+      box-shadow:var(--shadow-soft);
+      font-size:13px;
+      color:#6a7187;
+      text-align:center;
+      max-width:min(90vw,760px);
+    }
+
+    @media (max-width: 920px){
+      html,body{overflow:auto}
+      .app{height:auto; min-height:100vh}
+      .board-wrap{
+        position:relative;
+        grid-template-columns:1fr;
+        padding:100px 22px 110px;
+        gap:18px;
+      }
+      .board{min-height:34vh}
+      .topbar{width:calc(100vw - 24px)}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="floating-decor"></div>
+
+    <div class="topbar">
+      <strong>🧷 马卡龙便利贴 Todo Board</strong>
+      <span class="legend"><span class="dot" style="background:var(--work)"></span>工作</span>
+      <span class="legend"><span class="dot" style="background:var(--fun)"></span>娱乐</span>
+      <span class="legend"><span class="dot" style="background:var(--life)"></span>生活</span>
+      <span class="legend"><span class="dot" style="background:var(--study)"></span>学习</span>
+    </div>
+
+    <div class="board-wrap">
+      <section class="board-shell">
+        <div class="board todo" data-status="todo" id="todoBoard">
+          <div class="board-title">
+            <div class="label-pill"><span class="emoji">📝</span>to do</div>
+            <button class="add-btn" id="openModalBtn">+ 添加便利贴</button>
+          </div>
+          <div class="note-layer" id="todoLayer"></div>
+        </div>
+      </section>
+
+      <section class="board-shell">
+        <div class="board doing" data-status="doing">
+          <div class="board-title">
+            <div class="label-pill"><span class="emoji">🌷</span>doing</div>
+          </div>
+          <div class="note-layer" id="doingLayer"></div>
+        </div>
+      </section>
+
+      <section class="board-shell">
+        <div class="board done" data-status="done">
+          <div class="board-title">
+            <div class="label-pill"><span class="emoji">✨</span>done</div>
+          </div>
+          <div class="note-layer" id="doneLayer"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="tip">点击整块 To Do 洞洞板可新增便利贴；悬停可编辑/删除；拖拽时会有“拿起”感，删除会像撕掉纸条 ✂️</div>
+
+    <div class="modal-backdrop" id="modalBackdrop">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <h2 id="modalTitle">添加便利贴</h2>
+        <p id="modalDesc">点在 To Do 板上的位置附近，会贴上一张新的便利贴。</p>
+
+        <div class="field">
+          <label for="taskText">待办事项</label>
+          <textarea id="taskText" placeholder="比如：写论文 / 跳舞 / 背单词 / 买东西..."></textarea>
+        </div>
+
+        <div class="field">
+          <label>分类</label>
+          <div class="chip-row">
+            <label class="chip"><input type="radio" name="category" value="work" checked><span><i class="chip-swatch" style="background:var(--work)"></i>工作</span></label>
+            <label class="chip"><input type="radio" name="category" value="fun"><span><i class="chip-swatch" style="background:var(--fun)"></i>娱乐</span></label>
+            <label class="chip"><input type="radio" name="category" value="life"><span><i class="chip-swatch" style="background:var(--life)"></i>生活</span></label>
+            <label class="chip"><input type="radio" name="category" value="study"><span><i class="chip-swatch" style="background:var(--study)"></i>学习</span></label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn secondary" id="cancelBtn">取消</button>
+          <button class="btn primary" id="saveBtn">完成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'macaron_pegboard_todo_v3';
+
+    const STICKERS = ['🌼','⭐','🍓','☁️','🫧','🎀','💗','🧸'];
+    const CATEGORY_LABELS = { work:'工作', fun:'娱乐', life:'生活', study:'学习' };
+
+    const layers = {
+      todo: document.getElementById('todoLayer'),
+      doing: document.getElementById('doingLayer'),
+      done: document.getElementById('doneLayer')
+    };
+
+    const boards = [...document.querySelectorAll('.board')];
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const openModalBtn = document.getElementById('openModalBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const taskText = document.getElementById('taskText');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalDesc = document.getElementById('modalDesc');
+    const todoBoard = document.getElementById('todoBoard');
+
+    let notes = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let editingId = null;
+    let pendingTodoPosition = null;
+
+    function saveNotes(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+    }
+
+    function makeId(){
+      return 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+    }
+
+    function nowStamp(){
+      const d = new Date();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mi = String(d.getMinutes()).padStart(2,'0');
+      return `${mm}/${dd} ${hh}:${mi}`;
+    }
+
+    function randomBetween(min,max){
+      return min + Math.random() * (max - min);
+    }
+
+    function pickSticker(){
+      return STICKERS[Math.floor(Math.random() * STICKERS.length)];
+    }
+
+    function boardRects(){
+      return boards.map(b => {
+        const r = b.getBoundingClientRect();
+        return { status:b.dataset.status, left:r.left, right:r.right, top:r.top, bottom:r.bottom };
+      });
+    }
+
+    function setCategoryValue(value){
+      const target = document.querySelector(`input[name="category"][value="${value}"]`);
+      if(target) target.checked = true;
+    }
+
+    function openModal(mode='create', note=null){
+      editingId = note?.id || null;
+      if(mode === 'edit' && note){
+        modalTitle.textContent = '编辑便利贴';
+        modalDesc.textContent = '可以修改内容和分类，时间戳会更新。';
+        taskText.value = note.text;
+        setCategoryValue(note.category);
+      }else{
+        modalTitle.textContent = '添加便利贴';
+        modalDesc.textContent = '点在 To Do 板上的位置附近，会贴上一张新的便利贴。';
+        taskText.value = '';
+        setCategoryValue('work');
+      }
+      modalBackdrop.classList.add('show');
+      setTimeout(() => taskText.focus(), 20);
+    }
+
+    function closeModal(){
+      modalBackdrop.classList.remove('show');
+      taskText.value = '';
+      editingId = null;
+      pendingTodoPosition = null;
+      setCategoryValue('work');
+    }
+
+    openModalBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      openModal('create');
+    });
+
+    cancelBtn.addEventListener('click', closeModal);
+    modalBackdrop.addEventListener('click', (e)=>{ if(e.target === modalBackdrop) closeModal(); });
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && modalBackdrop.classList.contains('show')) closeModal(); });
+
+    todoBoard.addEventListener('click', (e)=>{
+      if(e.target.closest('.note') || e.target.closest('.add-btn')) return;
+      const rect = layers.todo.getBoundingClientRect();
+      pendingTodoPosition = {
+        x: e.clientX - rect.left - 62,
+        y: e.clientY - rect.top - 18
+      };
+      openModal('create');
+    });
+
+    saveBtn.addEventListener('click', ()=>{
+      const text = taskText.value.trim();
+      const category = document.querySelector('input[name="category"]:checked').value;
+      if(!text){
+        taskText.focus();
+        return;
+      }
+
+      if(editingId){
+        const target = notes.find(n => n.id === editingId);
+        if(target){
+          target.text = text;
+          target.category = category;
+          target.updatedAt = nowStamp();
+        }
+      }else{
+        const defaultPos = pendingTodoPosition || { x: 18 + Math.random()*80, y: 18 + Math.random()*60 };
+        notes.push({
+          id: makeId(),
+          text,
+          category,
+          status:'todo',
+          x: defaultPos.x,
+          y: defaultPos.y,
+          rotate: randomBetween(-7, 7),
+          tapeRot: randomBetween(-8, 8),
+          sticker: pickSticker(),
+          createdAt: nowStamp(),
+          updatedAt: nowStamp()
+        });
+      }
+
+      saveNotes();
+      renderAll();
+      closeModal();
+    });
+
+    function keepInBounds(note, layer){
+      const maxX = Math.max(8, layer.clientWidth - 136);
+      const maxY = Math.max(8, layer.clientHeight - 144);
+      note.x = Math.max(6, Math.min(note.x, maxX));
+      note.y = Math.max(6, Math.min(note.y, maxY));
+    }
+
+    function deleteWithPeel(noteId, el){
+      el.classList.add('peel');
+      setTimeout(()=>{
+        notes = notes.filter(n => n.id !== noteId);
+        saveNotes();
+        renderAll();
+      }, 320);
+    }
+
+    function renderAll(settleId = null){
+      Object.values(layers).forEach(layer => layer.innerHTML = '');
+
+      notes.forEach(note => {
+        if(!note.sticker) note.sticker = pickSticker();
+        if(note.tapeRot == null) note.tapeRot = randomBetween(-8, 8);
+        if(note.rotate == null) note.rotate = randomBetween(-7, 7);
+        if(!note.createdAt) note.createdAt = nowStamp();
+        if(!note.updatedAt) note.updatedAt = note.createdAt;
+
+        const el = document.createElement('article');
+        el.className = `note ${note.category} ${note.status === 'done' ? 'done' : ''} ${settleId === note.id ? 'settle' : ''}`;
+        el.dataset.id = note.id;
+        el.style.left = note.x + 'px';
+        el.style.top = note.y + 'px';
+        el.style.setProperty('--rot', `${note.rotate}deg`);
+        el.style.setProperty('--tape-rot', `${note.tapeRot}deg`);
+        el.style.transform = `rotate(${note.rotate}deg)`;
+
+        el.innerHTML = `
+          <div class="tape"></div>
+          <div class="pin"></div>
+          <div class="note-top">
+            <div class="note-meta">
+              <span class="category-badge">${CATEGORY_LABELS[note.category] || '生活'}</span>
+              <span class="time-stamp">${note.updatedAt}</span>
+            </div>
+            <div class="note-text"></div>
+          </div>
+          <div class="note-bottom">
+            <div class="sticker-wrap">
+              <span class="checkmark">✅</span>
+              <span class="sticker">${note.sticker}</span>
+            </div>
+            <div class="note-actions">
+              <button class="icon-btn edit-btn" title="编辑">✏️</button>
+              <button class="icon-btn delete-btn" title="删除">🗑️</button>
+            </div>
+          </div>
+        `;
+        el.querySelector('.note-text').textContent = note.text;
+
+        el.querySelector('.edit-btn').addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          openModal('edit', note);
+        });
+
+        el.querySelector('.delete-btn').addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          deleteWithPeel(note.id, el);
+        });
+
+        addDrag(el, note);
+
+        const layer = layers[note.status];
+        if(layer){
+          keepInBounds(note, layer);
+          el.style.left = note.x + 'px';
+          el.style.top = note.y + 'px';
+          layer.appendChild(el);
+        }
+      });
+    }
+
+    function addDrag(el, note){
+      let startX = 0, startY = 0, originX = 0, originY = 0, dragging = false;
+
+      const onPointerMove = (e) => {
+        if(!dragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        const tilt = Math.max(-12, Math.min(12, dx * .08));
+        el.style.left = originX + dx + 'px';
+        el.style.top = originY + dy + 'px';
+        el.style.transform = `rotate(${note.rotate + tilt}deg) scale(1.04)`;
+
+        boards.forEach(b => b.classList.remove('active-drop'));
+        const target = boardRects().find(r => e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+        if(target){
+          const boardEl = document.querySelector(`.board[data-status="${target.status}"]`);
+          if(boardEl) boardEl.classList.add('active-drop');
+        }
+      };
+
+      const onPointerUp = (e) => {
+        if(!dragging) return;
+        dragging = false;
+        el.classList.remove('dragging');
+        boards.forEach(b => b.classList.remove('active-drop'));
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        let nextStatus = note.status;
+
+        const target = boardRects().find(r => e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+        if(target) nextStatus = target.status;
+
+        if(nextStatus !== note.status){
+          note.status = nextStatus;
+          const targetLayer = layers[note.status];
+          const targetRect = targetLayer.getBoundingClientRect();
+          note.x = e.clientX - targetRect.left - 62;
+          note.y = e.clientY - targetRect.top - 20;
+          note.updatedAt = nowStamp();
+        }else{
+          note.x = originX + dx;
+          note.y = originY + dy;
+        }
+
+        note.rotate = randomBetween(-8, 8);
+        note.tapeRot = randomBetween(-8, 8);
+        keepInBounds(note, layers[note.status]);
+        saveNotes();
+        renderAll(note.id);
+      };
+
+      el.addEventListener('pointerdown', (e)=>{
+        if(e.target.closest('.icon-btn')) return;
+        dragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        originX = parseFloat(el.style.left) || 0;
+        originY = parseFloat(el.style.top) || 0;
+        el.classList.add('dragging');
+        el.setPointerCapture?.(e.pointerId);
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+      });
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>
